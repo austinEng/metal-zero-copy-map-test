@@ -30,3 +30,20 @@ The slowdown incurred from the copy comes out unsurprisingly to be the amount of
 |-|-|
 | 0-copy | 5840 µs |
 | 1-copy | 7900 µs (35.2% slower) |
+
+## Shared Memory Mapping Details
+Below is an overview of how the app shares and maps the memory.
+
+The child process creates a shared memory region "mem_port" using `mach_make_memory_entry_64`.
+
+The child process allocates a "heap" using `vm_allocate`.
+
+The child process maps "mem_port" to an arbitrary "mapped_address" using `vm_map`.
+
+The child process remaps "mapped_address" into the middle of the "heap" using `vm_remap`.
+
+The child process continually updates the triangle data stored in the middle of "heap".
+
+The parent process receives "mem_port" from the child, maps it to an arbitrary "buf_address".
+
+The parent process creates a MTLBuffer wrapping "buf_address" and renders from it as a vertex buffer.

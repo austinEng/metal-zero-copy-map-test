@@ -249,9 +249,9 @@ int main(int argc, char* argv[]) {
     }
 
     // Map the memory port.
-    vm_address_t vm_address = 0;
+    vm_address_t buf_address = 0;
     if (vm_map(mach_task_self(),
-              &vm_address,
+              &buf_address,
               vm_size,
               0,  // Alignment mask
               VM_FLAGS_ANYWHERE, mem_port, /* offset */ 0,
@@ -274,7 +274,7 @@ int main(int argc, char* argv[]) {
                                    options:MTLResourceCPUCacheModeWriteCombined | MTLResourceStorageModeShared];
     } else {
       // Create a buffer wrapping the vm allocation.
-      buffer = [device newBufferWithBytesNoCopy:reinterpret_cast<void*>(vm_address)
+      buffer = [device newBufferWithBytesNoCopy:reinterpret_cast<void*>(buf_address)
                                          length:vm_size
                                         options:MTLResourceCPUCacheModeWriteCombined | MTLResourceStorageModeShared
                                     deallocator:^(void *pointer, NSUInteger length) {}];
@@ -408,7 +408,7 @@ fragment float4 fragment_main(VertexOut vert [[stage_in]])
       if (use_copy) {
         // Copy data from the child process to the buffer.
         using Triangle = Vertex[3];
-        Triangle* triangles = reinterpret_cast<Triangle*>(vm_address);
+        Triangle* triangles = reinterpret_cast<Triangle*>(buf_address);
         memcpy([buffer contents], triangles, sizeof(Triangle) * num_triangles);
       }
 
