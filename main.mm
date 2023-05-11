@@ -173,10 +173,17 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
+    // Allocate a "heap"
+    vm_address_t heap_address = 0;
+    if (vm_allocate(mach_task_self(), &heap_address, 3 * vm_size, /* anywhere */ true)  != KERN_SUCCESS) {
+      fprintf(stderr, "child failed to allocate heap\n");
+      exit(1);
+    }
+
     // Map the memory port in the child procress.
-    vm_address_t vm_address = 0;
+    vm_address_t mapped_address = 0;
     if (vm_map(mach_task_self(),
-              &vm_address,
+              &mapped_address,
               vm_size,
               0,  // Alignment mask
               VM_FLAGS_ANYWHERE, mem_port,   /* offset */ 0,
@@ -188,8 +195,25 @@ int main(int argc, char* argv[]) {
       exit(1);
     }
 
+    // Remap the mapped memory into the heap
+    vm_address_t target_address = heap_address + align(vm_size, getpagesize());
+    vm_address_t remapped_address = target_address;
+    vm_prot_t cur_protection = VM_PROT_READ | VM_PROT_WRITE;
+    vm_prot_t max_protection = VM_PROT_READ | VM_PROT_WRITE;
+    if (vm_remap(mach_task_self(), &remapped_address, vm_size, 0,
+                 VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE,
+                 mach_task_self(), mapped_address, /* copy */ false,
+                 &cur_protection, &max_protection, VM_INHERIT_SHARE) != KERN_SUCCESS) {
+      fprintf(stderr, "child failed to remap into heap\n");
+      exit(1);
+    }
+    if (remapped_address != target_address) {
+      fprintf(stderr, "child failed to remap into directly into target\n");
+      exit(1);
+    }
+
     using Triangle = Vertex[3];
-    Triangle* triangles = reinterpret_cast<Triangle*>(vm_address);
+    Triangle* triangles = reinterpret_cast<Triangle*>(target_address);
 
     // Initialize triangle positions
     for (uint32_t t = 0; t < num_triangles; ++t) {
